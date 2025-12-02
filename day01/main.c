@@ -30,33 +30,13 @@ int main(int argc, char *argv[]) {
 
   while ((line = fgetln(file, &len)) != NULL) {
     sscanf(line, "%c%d", &dir, &num);
-
-    switch (dir) {
-    case 'L': {
-      if (pos == 0) {
-        res2--;
-      }
-
-      pos -= num;
-
-      while (pos < 0) {
-        pos += max_value;
-        res2++;
-      }
-
-      if (pos == 0) {
-        res2++;
-      }
-    } break;
-    case 'R': {
-      pos += num;
-
-      while (pos >= max_value) {
-        pos -= max_value;
-        res2++;
-      }
-    } break;
+    if (dir == 'L') {
+      num *= -1;
     }
+
+    div_t r = div(pos + num, max_value);
+    res2 += abs(r.quot) + (dir == 'L' && (r.rem <= 0) - (pos == 0));
+    pos = r.rem < 0 ? max_value + r.rem : r.rem;
 
     if (pos == 0)
       res1++;
