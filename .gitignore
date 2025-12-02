@@ -1,0 +1,16 @@
+# Compiled executables
+/bin
+
+# Puzzle inputs
+**/input.txt
+
+# C build artifacts
+*.o
+*.obj
+*.out
+
+# Common editor/OS files
+.vscode/
+.DS_Store
+*.swp
+*~
