@@ -21,13 +21,15 @@ int main(int argc, char *argv[]) {
   char *line;
   size_t len;
 
-  bool beam[256] = {0};
+  uint64_t beam[256] = {0};
+  size_t beam_len = 0;
 
   while ((line = fgetln(file, &len)) != NULL) {
     len -= 1; // last char is \n
+    beam_len = beam_len > 0 ? beam_len : len;
     for (size_t i = 0; i < len; ++i) {
       if (line[i] == 'S') {
-        beam[i] = true;
+        beam[i] = 1;
         printf("S");
       } else if (line[i] == '.') {
         if (beam[i]) {
@@ -38,10 +40,10 @@ int main(int argc, char *argv[]) {
       } else if (line[i] == '^') {
         if (beam[i]) {
           printf("\b|^");
-          beam[i - 1] = true;
-          beam[i] = false;
-          beam[i + 1] = true;
-          res1++;
+          res1 += 1;
+          beam[i - 1] += beam[i];
+          beam[i + 1] += beam[i];
+          beam[i] = 0;
         } else {
           printf("^");
         }
@@ -51,6 +53,10 @@ int main(int argc, char *argv[]) {
   }
 
   printf("Result for part 1: %lld\n", res1);
+
+  for (size_t i = 0; i < beam_len; ++i) {
+    res2 += beam[i];
+  }
   printf("Result for part 2: %lld\n", res2);
 
   fclose(file);
