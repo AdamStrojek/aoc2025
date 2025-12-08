@@ -57,6 +57,7 @@ int main(int argc, char *argv[]) {
     while ((c = fgetc(file)) != EOF) {
       if (isspace(c))
         continue;
+      data[n] = c == '*'; // starting value for data, when mult set to 1
       ops[n++] = c;
     }
   }
@@ -67,8 +68,6 @@ int main(int argc, char *argv[]) {
 
   // Reset and start from beggining
   fseek(file, 0, SEEK_SET);
-  bool init = true;
-
   // char ch;
 
   // while (isdigit(fpeek(file))) {
@@ -99,20 +98,16 @@ int main(int argc, char *argv[]) {
       char *parse_end;
       uint64_t numb = strtoimax(p, &parse_end, 10);
 
-      if (init) {
-        data[data_pos] = numb;
-      } else {
-        switch (ops[data_pos]) {
-        case '+':
-          data[data_pos] += numb;
-          break;
-        case '*':
-          data[data_pos] *= numb;
-          break;
-        }
+      switch (ops[data_pos]) {
+      case '+':
+        data[data_pos] += numb;
+        break;
+      case '*':
+        data[data_pos] *= numb;
+        break;
       }
 
-      // printf("Resp %lld\n", data[data_pos]);
+      printf("Resp %lld\n", data[data_pos]);
 
       p = parse_end;
       data_pos++;
@@ -123,7 +118,6 @@ int main(int argc, char *argv[]) {
       // part
       break;
     }
-    init = false;
   }
 
   for (size_t i = 0; i < n; ++i) {
