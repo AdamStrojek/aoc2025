@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -std=c23 -Wall -Wextra -pedantic -ggdb
+CFLAGS = -std=c23 -Wall -Wextra -pedantic -ggdb -Icommon
 BIN_DIR = bin
 
 # Find all main.c files in day* directories
