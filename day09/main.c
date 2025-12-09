@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -17,6 +18,23 @@ typedef struct {
 } tile_list_t;
 
 void tile_print(tile_t *t) { printf("%lux%lu", t->x, t->y); }
+
+void tile_grid_print(tile_list_t *list, size_t max_x, size_t max_y) {
+  for (size_t y = 0; y < max_y; ++y) {
+    for (size_t x = 0; x < max_x; ++x) {
+      bool exists = false;
+      da_foreach(list, i) {
+        if (list->items[i].x == x && list->items[i].y == y) {
+          exists = true;
+          break;
+        }
+      }
+
+      printf(exists ? "#" : ".");
+    }
+    printf("\n");
+  }
+}
 
 size_t tile_area(tile_t *a, tile_t *b) {
   size_t len_x = MAX(a->x, b->y) - MIN(a->x, b->x) + 1;
@@ -55,20 +73,18 @@ int main(int argc, char *argv[]) {
     da_append(&list, t);
   }
 
+  printf("Board:\n");
+
+  tile_grid_print(&list, 14, 9);
+
   printf("Calculating areas:\n");
-  da_foreach(list, i) {
-    da_foreach(list, j) {
+  da_foreach(&list, i) {
+    da_foreach(&list, j) {
       if (i >= j)
         continue;
       size_t area = tile_area(list.items + i, list.items + j);
       // Max area
       res1 = MAX(res1, area);
-
-      printf("%lu:%lu ", i, j);
-      tile_print(list.items + i);
-      printf(" ");
-      tile_print(list.items + j);
-      printf("-> %ld\n", area);
     }
   }
 

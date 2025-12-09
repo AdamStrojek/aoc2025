@@ -31,6 +31,6 @@
   da_reserve((da), (da)->len + 1);                                             \
   (da)->items[(da)->len++] = (item)
 
-#define da_foreach(da, index) for (size_t index = 0; index < da.len; ++index)
+#define da_foreach(da, index) for (size_t index = 0; index < (da)->len; ++index)
 
 #endif // DA_H
