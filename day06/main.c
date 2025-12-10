@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <ctype.h>
 #include <inttypes.h>
 #include <stddef.h>
@@ -6,17 +7,60 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Source - https://stackoverflow.com/a
-// Posted by ephemient, modified by community. See post 'Timeline' for change
-// history Retrieved 2025-12-07, License - CC BY-SA 2.5
+#include "da.h"
 
-int fpeek(FILE *stream) {
-  int c;
+typedef struct {
+  char op;
+  // Position of op based on starting position
+  size_t pos;
+} op_t;
 
-  c = fgetc(stream);
-  ungetc(c, stream);
+typedef struct {
+  op_t *items;
+  size_t len;
+  size_t capacity;
+} op_list_t;
 
-  return c;
+typedef struct {
+  char **items;
+  size_t len;
+  size_t capacity;
+} data_t;
+
+int load_data(char *filename, data_t *data) {
+  FILE *file = fopen(filename, "r");
+  if (file == NULL) {
+    perror("Error opening file");
+    return -1;
+  }
+
+  char *line;
+  size_t len;
+
+  while ((line = fgetln(file, &len)) != NULL) {
+    len = line[len - 1] == '\n' ? len - 1 : len; // Removing \n
+    char *item = malloc(len + 1); // Adding 1 for null-termination
+    strncpy(item, line, len);
+    da_append(data, item);
+  }
+
+  fclose(file);
+  return data->len;
+}
+
+void process_ops(const char *op_data, op_list_t *list) {
+  char ch;
+  size_t pos = 0;
+
+  while ((ch = *(op_data++)) != 0) {
+    if (!isspace(ch)) {
+      // If not space dumping operator
+      auto tmp = (op_t){.op = ch, .pos = pos};
+      da_append(list, tmp);
+    }
+
+    ++pos;
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -25,108 +69,42 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  char *filepath = argv[1];
-  FILE *file = fopen(filepath, "r");
+  char *filename = argv[1];
 
-  if (file == NULL) {
-    perror("Error opening file");
-    return 1;
-  }
+  data_t data = {0};
+  op_list_t list = {0};
+  load_data(filename, &data);
+  process_ops(data.items[data.len - 1], &list);
+  // We no longer need operators list, it has been processed
+  free(da_pop_last(&data));
 
   uint64_t res1 = 0;
   uint64_t res2 = 0;
 
-  char *line;
-  size_t len;
+  da_foreach(&list, i) {
+    auto *item = list.items + i;
+    uint64_t result = (item->op == '*');
 
-  uint64_t data[1100] = {0};
-  char ops[1100] = {0};
-  size_t n = 0;
-
-  // Go to last line
-  if (file) {
-    fseek(file, 0, SEEK_END);
-    long pos = ftell(file);
-    char c;
-    while (pos > 0 && (c = fgetc(file)) != '\n') {
-      fseek(file, --pos, SEEK_SET);
-    }
-    // Now read the line forward from here
-    fseek(file, pos + 1, SEEK_SET);
-
-    while ((c = fgetc(file)) != EOF) {
-      if (isspace(c))
-        continue;
-      data[n] = c == '*'; // starting value for data, when mult set to 1
-      ops[n++] = c;
-    }
-  }
-
-  // for (size_t i = 0; i < n; ++i) {
-  //   printf("Op: %c\n", ops[i]);
-  // }
-
-  // Reset and start from beggining
-  fseek(file, 0, SEEK_SET);
-  // char ch;
-
-  // while (isdigit(fpeek(file))) {
-  //   do {
-  //     // Scanning single line
-  //     uint64_t num;
-  //     fscanf(file, "%llu", &num);
-  //     printf("Number scanned %llu\n", num);
-  //   } while (fgetc(file) != '\n');
-  //   printf("Next line\n");
-  // }
-
-  while ((line = fgetln(file, &len)) != NULL) {
-    // len -= 1; // line contain whole text with \n at the end, we don't care
-    // about
-
-    size_t data_pos = 0;
-    char *p = line;
-    char *end = line + len;
-
-    while (p < end) {
-      // Skip whitespace
-      while (p < end && isspace(*p))
-        p++;
-      if (p >= end)
-        break;
-
-      char *parse_end;
-      uint64_t numb = strtoimax(p, &parse_end, 10);
-
-      switch (ops[data_pos]) {
-      case '+':
-        data[data_pos] += numb;
-        break;
-      case '*':
-        data[data_pos] *= numb;
-        break;
+    da_foreach(&data, j) {
+      uint64_t x;
+      if (sscanf(data.items[j] + item->pos, "%llu", &x) > 0) {
+        printf("Found %lld\n", x);
+        if (item->op == '*') {
+          result *= x;
+        } else {
+          result += x;
+        }
+      } else {
+        assert(false && "Failed reading digit!");
       }
-
-      printf("Resp %lld\n", data[data_pos]);
-
-      p = parse_end;
-      data_pos++;
     }
-
-    if (!isspace(*p)) {
-      // Line not ended, because we encountered non-number, we are in operations
-      // part
-      break;
-    }
-  }
-
-  for (size_t i = 0; i < n; ++i) {
-    res1 += data[i];
+    printf("Op: %c, pos: %lu result: %llu\n", list.items[i].op,
+           list.items[i].pos, result);
+    res1 += result;
   }
 
   printf("Result for part 1: %lld\n", res1);
   printf("Result for part 2: %lld\n", res2);
 
-  fclose(file);
   return 0;
 }

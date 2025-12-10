@@ -31,7 +31,9 @@
   da_reserve((da), (da)->len + 1);                                             \
   (da)->items[(da)->len++] = (item)
 
-#define da_remove(da, index) (da)->items[index] = (da)->items[--(da)->len]
+#define da_remove(da, index) ((da)->items[index] = (da)->items[--(da)->len])
+
+#define da_pop_last(da) ((da)->items[--(da)->len])
 
 #define da_foreach(da, index) for (size_t index = 0; index < (da)->len; ++index)
 
