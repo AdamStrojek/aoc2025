@@ -124,9 +124,14 @@ int main(int argc, char *argv[]) {
 
   printf("Calculating...\n");
 
+  uint64_t res1 = 1;
+  uint64_t res2 = 0;
+
   junction_conn_t conn = {0};
-  // // DEBUG
-  for (size_t i = 0; i < 1000; ++i) {
+
+  int part = 2;
+  size_t max_i = part == 1 ? 100 : p_len;
+  for (size_t i = 0; i < max_i; ++i) {
     junction_pair_t *pair = p + i;
 
     size_t match_a = -1;
@@ -172,6 +177,11 @@ int main(int argc, char *argv[]) {
       da_append(&l, pair->b_idx);
       da_append(&conn, l);
     }
+
+    if (conn.items[0].len == 1000) {
+      res2 = points[pair->a_idx].x * points[pair->b_idx].x;
+      break;
+    }
   }
 
   size_t *lens = malloc(conn.len * sizeof(size_t));
@@ -179,9 +189,6 @@ int main(int argc, char *argv[]) {
   da_foreach(&conn, c_idx) lens[c_idx] = conn.items[c_idx].len;
 
   qsort(lens, conn.len, sizeof(size_t), comp);
-
-  uint64_t res1 = 1;
-  uint64_t res2 = 0;
 
   for (size_t i = 0; i < 3; ++i) {
     // printf("Connection %ld has %lu items\n", i, lens[i]);
