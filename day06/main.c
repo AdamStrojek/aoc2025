@@ -13,6 +13,7 @@ typedef struct {
   char op;
   // Position of op based on starting position
   size_t pos;
+  size_t len;
 } op_t;
 
 typedef struct {
@@ -54,6 +55,10 @@ void process_ops(const char *op_data, op_list_t *list) {
 
   while ((ch = *(op_data++)) != 0) {
     if (!isspace(ch)) {
+      if (list->len > 0) {
+        // Updating previous one
+        da_last(list).len = pos - da_last(list).pos - 1;
+      }
       // If not space dumping operator
       auto tmp = (op_t){.op = ch, .pos = pos};
       da_append(list, tmp);
@@ -61,6 +66,10 @@ void process_ops(const char *op_data, op_list_t *list) {
 
     ++pos;
   }
+
+  // Workaround, we can't estimate how many numbers has last operation, but it
+  // always will be max 4
+  da_last(list).len = 4;
 }
 
 int main(int argc, char *argv[]) {
@@ -72,39 +81,67 @@ int main(int argc, char *argv[]) {
   char *filename = argv[1];
 
   data_t data = {0};
-  op_list_t list = {0};
+  op_list_t op_list = {0};
   load_data(filename, &data);
-  process_ops(data.items[data.len - 1], &list);
-  // We no longer need operators list, it has been processed
+  process_ops(data.items[data.len - 1], &op_list);
+  // We no longer need operators list, it has been processed and can be
+  // discarded/freed
   free(da_pop_last(&data));
 
-  uint64_t res1 = 0;
-  uint64_t res2 = 0;
+  uint64_t answer_part_1 = 0;
+  uint64_t answer_part_2 = 0;
 
-  da_foreach(&list, i) {
-    auto *item = list.items + i;
-    uint64_t result = (item->op == '*');
+  da_foreach(&op_list, i) {
+    auto item = op_list.items + i;
+    uint64_t result_1 = (item->op == '*');
+    uint64_t result_2 = result_1;
 
+    // Calculating part 1
+    uint64_t x;
     da_foreach(&data, j) {
-      uint64_t x;
       if (sscanf(data.items[j] + item->pos, "%llu", &x) > 0) {
-        printf("Found %lld\n", x);
         if (item->op == '*') {
-          result *= x;
+          result_1 *= x;
         } else {
-          result += x;
+          result_1 += x;
         }
       } else {
         assert(false && "Failed reading digit!");
       }
     }
-    printf("Op: %c, pos: %lu result: %llu\n", list.items[i].op,
-           list.items[i].pos, result);
-    res1 += result;
+
+    // Calculating part 2
+    size_t size = op_list.items[i].len * sizeof(uint64_t);
+    uint64_t *y = malloc(size);
+    memset(y, 0, size);
+    for (size_t k = 0; k < op_list.items[i].len; k++) {
+      da_foreach(&data, j) {
+        auto line = data.items[j];
+        auto d = line[item->pos + k];
+        if (isdigit(d)) {
+          y[k] *= 10;
+          y[k] += d - '0';
+        }
+      }
+
+      if (y[k] > 0) {
+        if (item->op == '*') {
+          result_2 *= y[k];
+        } else {
+          result_2 += y[k];
+        }
+      }
+    }
+    free(y);
+
+    printf("Op: %c, pos: %lu, len: %lu, result 2: %llu\n", op_list.items[i].op,
+           op_list.items[i].pos, op_list.items[i].len, result_2);
+    answer_part_1 += result_1;
+    answer_part_2 += result_2;
   }
 
-  printf("Result for part 1: %lld\n", res1);
-  printf("Result for part 2: %lld\n", res2);
+  printf("Result for part 1: %lld\n", answer_part_1);
+  printf("Result for part 2: %lld\n", answer_part_2);
 
   return 0;
 }

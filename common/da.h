@@ -35,6 +35,8 @@
 
 #define da_pop_last(da) ((da)->items[--(da)->len])
 
+#define da_last(da) ((da)->items[(da)->len - 1])
+
 #define da_foreach(da, index) for (size_t index = 0; index < (da)->len; ++index)
 
 #endif // DA_H
