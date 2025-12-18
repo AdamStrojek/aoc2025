@@ -14,15 +14,36 @@ typedef uint16_t lights_t;
 typedef lights_t button_mask_t;
 
 typedef struct {
-  // I store buttons as mask
-  button_mask_t *items;
+  int *items;
+  button_mask_t mask;
+  size_t len;
+  size_t capacity;
+} button_t;
+
+typedef struct {
+  button_t *items;
   size_t len;
   size_t capacity;
 } button_list_t;
 
+button_mask_t button_to_mask(size_t lights_len, button_t *group) {
+  da_foreach(group, i) {
+
+    group->mask |= 1 << (lights_len - group->items[i] - 1);
+  }
+  return group->mask;
+}
+
+typedef struct {
+  int *items;
+  size_t len;
+  size_t capacity;
+} joltage_list_t;
+
 typedef struct {
   lights_t lights;
   button_list_t buttons;
+  joltage_list_t joltage;
 } data_t;
 
 typedef struct {
@@ -33,6 +54,7 @@ typedef struct {
 
 typedef struct {
   lights_t light;
+  int *joltage;
   int lvl;
 } lights_lvl_t;
 
@@ -67,12 +89,18 @@ void print_data(data_list_t *list) {
     printf("Light:\n");
     print_mask(item.lights);
     printf("\nButtons:\n01234567\n");
-    da_foreach(&list->items[i].buttons, j) {
-      // printf("(");
-      print_mask(item.buttons.items[j]);
+    da_foreach(&item.buttons, j) {
+      auto b_item = item.buttons.items[j];
+      print_mask(b_item.mask);
       printf("\n");
     }
-    printf("\n");
+
+    printf("joltage: {");
+    da_foreach(&item.joltage, j) {
+      auto j_item = item.joltage.items[j];
+      printf("%d, ", j_item);
+    }
+    printf("}\n");
   }
 }
 
@@ -84,7 +112,7 @@ void print_data(data_list_t *list) {
 // - lights_len - it will be required to do proper bit mask
 // Returns:
 // -1 -> string doesnt start with '(', you are probably reading wrong section
-int read_button_group(size_t lights_len, char *it, button_mask_t *group) {
+int read_button_group(size_t lights_len, char *it, button_t *group) {
   auto start = it;
   if (*it != '(') {
     return -1;
@@ -96,7 +124,28 @@ int read_button_group(size_t lights_len, char *it, button_mask_t *group) {
       r += *it - '0';
       it++;
     }
-    *group |= 1 << (lights_len - r - 1);
+    // *group |= 1 << (lights_len - r - 1);
+    da_append(group, r);
+  }
+
+  group->mask = button_to_mask(lights_len, group);
+
+  return it - start;
+}
+
+int read_jitter(char *it, joltage_list_t *joltage) {
+  auto start = it;
+  if (*it != '{') {
+    return -1;
+  }
+  while (*(it++) != '}') {
+    int r = 0;
+    while (isdigit(*it)) {
+      r *= 10;
+      r += *it - '0';
+      it++;
+    }
+    da_append(joltage, r);
   }
 
   return it - start;
@@ -144,16 +193,19 @@ int read_data(const char *filename, data_list_t *list) {
     };
 
     while (true) {
-      button_mask_t mask = 0;
-      int ret = read_button_group(lights_len, it, &mask);
+      button_t b = {0};
+      int ret = read_button_group(lights_len, it, &b);
       if (ret < 0) {
         break;
       }
-      da_append(&data.buttons, mask);
+      da_append(&data.buttons, b);
 
       it += ret;
       SKIP_SPACE(it);
     };
+
+    read_jitter(it, &data.joltage);
+
     da_append(list, data);
   }
   fclose(file);
@@ -166,6 +218,7 @@ int read_data(const char *filename, data_list_t *list) {
 // ----------------------
 #define LVL_LIMIT 10
 
+// #if 0
 int process_inner(lights_queue_t *q, lights_t expected, lights_t lights,
                   button_list_t *list, int lvl) {
   if (lvl > LVL_LIMIT) {
@@ -176,7 +229,8 @@ int process_inner(lights_queue_t *q, lights_t expected, lights_t lights,
   }
 
   da_foreach(list, i) {
-    lights_t new_light = lights ^ list->items[i];
+    auto item = list->items[i];
+    lights_t new_light = lights ^ item.mask;
     da_append(q, (lights_lvl_t){.light = new_light, .lvl = lvl + 1});
 
     // printf("Apply mask:     ");
@@ -197,11 +251,13 @@ int process_inner(lights_queue_t *q, lights_t expected, lights_t lights,
   return -1;
 }
 
-int process_list(lights_t expected, button_list_t *list) {
+int process_list(data_t data, button_list_t *list) {
   lights_queue_t q = {0};
 
   // Initial state of the lights, all should be turned off
-  da_append(&q, (lights_lvl_t){0, 1});
+  int *joltage = malloc(sizeof(int) * data.joltage.len);
+  memset(joltage, 0, sizeof(int) * data.joltage.len);
+  da_append(&q, (lights_lvl_t){0, joltage, 1});
 
   // printf("Expected: ");
   // print_mask(expected);
@@ -214,16 +270,20 @@ int process_list(lights_t expected, button_list_t *list) {
     // printf("\n");
 
     int ret =
-        process_inner(&q, expected, q.items[i].light, list, q.items[i].lvl);
+        process_inner(&q, data.lights, q.items[i].light, list, q.items[i].lvl);
 
     if (ret != -1) {
+      free(q.items->joltage);
+      free(q.items);
       return ret;
     }
     i++;
   }
+  free(q.items->joltage);
   free(q.items);
   return -1;
 }
+// #endif
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -235,7 +295,7 @@ int main(int argc, char *argv[]) {
 
   read_data(filename, &list);
 
-  // print_data(&list);
+  print_data(&list);
 
   uint64_t res1 = 0;
   uint64_t res2 = 0;
@@ -244,35 +304,15 @@ int main(int argc, char *argv[]) {
 
   da_foreach(&list, i) {
     da_item(&list, i, item);
-    int ret = process_list(item.lights, &item.buttons);
+    int ret = process_list(item, &item.buttons);
     if (ret > 0) {
       res1 += ret;
-      // printf("Found in %d attamepts\n", ret);
     } else {
       printf("Couldn't find soluton for line %ld, expected light ", i);
       print_mask(item.lights);
       printf("\n");
     }
   }
-
-  // button_mask_t items[] = {0b0001, 0b0101};
-  // button_list_t a = {
-  //     .items = items,
-  //     .len = sizeof(items) / sizeof(*items),
-  // };
-  // process_list(0b0100, &a);
-
-  // lights_t lights = 0b0000000000000010;
-
-  // button_mask_t mask = 0b0000000000000110;
-
-  // printf("Lights: ");
-  // print_mask(lights);
-  // printf("\nMask:   ");
-  // print_mask(mask);
-  // printf("\nResult: ");
-  // print_mask(lights ^= mask);
-  // printf("\n");
 
   printf("Result for part 1: %lld\n", res1);
   printf("Result for part 2: %lld\n", res2);

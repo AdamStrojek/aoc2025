@@ -39,6 +39,10 @@
 
 #define da_foreach(da, index) for (size_t index = 0; index < (da)->len; ++index)
 
+#define da_iter(da, item)                                                      \
+  for (size_t i = 0, _keep_ = 1; i < (da)->len; _keep_ = 1, i++)               \
+    for (auto item = (da)->items[i]; _keep_; _keep_ = 0)
+
 #define da_item(da, index, item_var_name)                                      \
   auto item_var_name = (da)->items[(index)]
 
